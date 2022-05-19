@@ -7,7 +7,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+
+#if CV_VERSION_MAJOR >= 4
+#include <opencv4/opencv2/opencv.hpp>
+#else
 #include <opencv2/opencv.hpp>   // Include OpenCV API
+#endif
 
 using namespace cv;
 using namespace std;
@@ -52,7 +57,12 @@ int main(int argc, char * argv[])
     while(1){
         rs2::frameset data = pipe.wait_for_frames();  
         auto aligned_frames = align.process(data);   // RGB画像に対してDepth画像を位置合わせ
-        rs2::frame depth_vis = color_map(aligned_frames.get_depth_frame());
+        rs2::frame depth_vis;
+        if (CV_VERSION_MAJOR < 4)
+            depth_vis = color_map(aligned_frames.get_depth_frame());
+        else
+            depth_vis = aligned_frames.get_depth_frame().apply_filter(color_map);
+        
         rs2::frame depth = aligned_frames.get_depth_frame();
         rs2::frame color = aligned_frames.get_color_frame();
 
@@ -99,7 +109,10 @@ cv::Mat frame_to_mat(const rs2::frame& f)
     {
         //cerr<<"RS2_FORMAT_RGB8"<<endl;
         auto r = Mat(Size(w, h), CV_8UC3, (void*)f.get_data(), Mat::AUTO_STEP);
-        cv::cvtColor(r, r, CV_BGR2RGB);
+        if (CV_MAJOR_VERSION < 4)
+            cv::cvtColor(r, r, CV_BGR2RGB);
+        else
+            cv::cvtColor(r, r, cv::COLOR_BGR2RGB);
         return r;
     }
     else if (f.get_profile().format() == RS2_FORMAT_Z16)
